@@ -1,0 +1,11 @@
+paddleocr
+paddlepaddle
+pillow
+numpy
+requests
+mysql-connector-python
+fastapi
+python-jose
+bcrypt
+python-dotenv
+uvicorn
