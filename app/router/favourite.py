@@ -59,6 +59,7 @@ async def delete_from_favourite(user_id: str, id: str):
         conn.commit()
         cursor.close()
         conn.close()
+        
         return {"done": "Book Deleted from favourite Successfully"}
 
     except Exception as e:

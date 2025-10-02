@@ -6,4 +6,4 @@ class BookUpdate(BaseModel):
     writer: str
     publisher: str
     category: str
-    total_pages: str
+    total_pages: int

@@ -1,5 +1,3 @@
-from math import fabs
-from re import T
 from fastapi import APIRouter, Response
 from app.router.user import UserToLogin, UserToSignUp
 from app.db import create_connection
@@ -72,7 +70,17 @@ async def login(user: UserToLogin):
         return {"id":current_user['id'],"acsses_token": token, "refresh_token": refresh_token}
 
     except Exception as e:
-        return {"error": f"Can not Login :{str(e)}"}
+        return {"error": f"Can not Login "}
     
     
  
+@router.post('/logout')
+async def logout(response:Response):
+    try:
+        response.delete_cookie('token')
+        response.delete_cookie('refresh_token')
+        response.delete_cookie('user_id')
+        
+        return {"message": "Logged out successfully"}
+    except:
+        return {"error":"Can not log out"}

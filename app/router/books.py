@@ -40,7 +40,7 @@ prompt = """
 {"book_name": "...", "category": "..."}
 
 """
-
+ 
 
 @router.post("/upload-book")
 async def extract_text(request: Request, file: UploadFile = File(...)):
@@ -176,7 +176,7 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
                     "image_url": image_return,
                     "is_in_daily": False,
                     "is_favourite": False,
-                    "is_read": False,
+                    
                 }
 
             else:
@@ -186,7 +186,7 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
 
     except Exception as e:
 
-        return {"error": f"Can not add the book: {str(e)}"}
+        return {"error": f"Can not add the book: "}
 
 
 @router.post("/add-book")
@@ -369,10 +369,10 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         conn.commit()
         cursor.close()
         conn.close()
-        return {"done": " Book Edited"}
+        return {"done": "Book Edited"}
 
     except Exception as e:
-        return {"error": "Can not Edit the book"}
+        return {"error": f"Can not Edit the book {str(e)} "}
 
 
 @router.patch("/set-book-read")
