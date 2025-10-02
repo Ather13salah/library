@@ -50,8 +50,8 @@ class VerifyToken(BaseHTTPMiddleware):
                     value=new_token,
                     httponly=True,
                     max_age=3600,
-                    samesite="lax",
-                    secure=False,
+                    samesite="none",
+                    secure=True,
                 )
                 return response
             
@@ -68,8 +68,8 @@ class VerifyToken(BaseHTTPMiddleware):
                 value=new_token,
                 httponly=True,
                 max_age=3600,
-                samesite="lax",
-                secure=False,
+                samesite="none",
+                secure=True,
             )
             return response
         except JWTError:
