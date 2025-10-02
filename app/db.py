@@ -1,12 +1,17 @@
+import os
 import mysql.connector as sql
+from urllib.parse import urlparse
 
+def create_connection():
+    """Create connection with Railway MySQL"""
+    db_url = os.getenv("DATABASE_URL")  # موجود في Railway env vars
+    url = urlparse(db_url)
 
-def create_connection(database):
-    """Create Connection with database"""
     return sql.connect(
-        host = 'localhost',
-        user = 'root',
-        password = 'ather2010',
-        database = database,
-        auth_plugin = 'mysql_native_password'
+        host=url.hostname,
+        user=url.username,
+        password=url.password,
+        database=url.path.lstrip("/"),
+        port=url.port,
+        auth_plugin='mysql_native_password'
     )
