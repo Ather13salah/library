@@ -11,7 +11,7 @@ router = APIRouter(prefix="/auth")
 @router.post("/signup")
 async def signup(user: UserToSignUp):
     try:
-        conn = create_connection('library')
+        conn = create_connection()
         cursor = conn.cursor()
         cursor.execute("select * from users where username=%s", (user.name,))
         name = cursor.fetchone()
@@ -48,7 +48,7 @@ async def signup(user: UserToSignUp):
 async def login(user: UserToLogin):
     """This function for making the login and check the password"""
     try:
-        conn = create_connection('library')
+        conn = create_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute("select * from users where username=%s", (user.name,))
         current_user = cursor.fetchone()
