@@ -6,7 +6,7 @@ router = APIRouter(prefix='/favourite')
 async def setInFavourite(user_id: str, id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -25,7 +25,7 @@ async def setInFavourite(user_id: str, id: str):
 async def get_books(user_id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
@@ -49,7 +49,7 @@ async def get_books(user_id: str):
 async def delete_from_favourite(user_id: str, id: str):
     try:
         
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(

@@ -46,7 +46,7 @@ prompt = """
 async def extract_text(request: Request, file: UploadFile = File(...)):
     try:
         user_id = request.cookies.get("id")  # get the user id
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
         # 1) قراءة الملف كـ bytes
         raw_bytes = await file.read()
@@ -118,71 +118,68 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
             if title_text == book_name[0]:
                 return {"error": "Book name is already exists"}
 
-        all_books = get_data("all_books", title_text, image_return, user_id)
-        if all_books == False:
-            query = requests.utils.requote_uri(title_text or "")
-            url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
-            gres = requests.get(url, timeout=10)
-            gdata = gres.json()
+        query = requests.utils.requote_uri(title_text or "")
+        url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
+        gres = requests.get(url, timeout=10)
+        gdata = gres.json()
 
-            if gdata.get("totalItems", 0) != 0:
+        if gdata.get("totalItems", 0) != 0:
 
-                # 10) تجهيز بيانات الكتاب
-                id = str(uuid.uuid4())
+            # 10) تجهيز بيانات الكتاب
+            id = str(uuid.uuid4())
 
-                authors = (
-                    gdata.get("items", [{}])[0].get("volumeInfo", {}).get("authors")
-                ) or ["غير معروف"]
-                writer = authors[0] if authors else "غير معروف"
+            authors = (
+                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("authors")
+            ) or ["غير معروف"]
+            writer = authors[0] if authors else "غير معروف"
 
-                publisher = (
-                    gdata.get("items", [{}])[0].get("volumeInfo", {}).get("publisher")
-                ) or "غير معروف"
-                total_pages = (
-                    gdata.get("items", [{}])[0].get("volumeInfo", {}).get("pageCount")
-                ) or 0
+            publisher = (
+                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("publisher")
+            ) or "غير معروف"
+            total_pages = (
+                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("pageCount")
+            ) or 0
 
-                # 11) إدخال البيانات في MySQL (لاحظ إضافة category)
+            # 11) إدخال البيانات في MySQL (لاحظ إضافة category)
 
-                cursor.execute(
-                    """
-                    INSERT INTO books (
-                        id, book_name, writer,
-                        book_type, publisher, total_pages,
-                        image_url, user_id, category
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    (
-                        id,
-                        title_text,
-                        writer,
-                        "كتاب نصي",
-                        publisher,
-                        total_pages,
-                        image_return,
-                        user_id,
-                        category_text,
-                    ),
-                )
-                conn.commit()
-                cursor.close()
-                conn.close()
+            cursor.execute(
+                """
+                INSERT INTO books (
+                    id, book_name, writer,
+                    book_type, publisher, total_pages,
+                    image_url, user_id, category
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (
+                    id,
+                    title_text,
+                    writer,
+                    "كتاب نصي",
+                    publisher,
+                    total_pages,
+                    image_return,
+                    user_id,
+                    category_text,
+                ),
+            )
+            conn.commit()
+            cursor.close()
+            conn.close()
 
-                # 12) الرد للعميل
-                return {
-                    "id": id,
-                    "book_name": title_text,
-                    "category": category_text,
-                    "image_url": image_return,
-                    "is_in_daily": False,
-                    "is_favourite": False,
-                    
-                }
+            # 12) الرد للعميل
+            return {
+                "id": id,
+                "book_name": title_text,
+                "category": category_text,
+                "image_url": image_return,
+                "is_in_daily": False,
+                "is_favourite": False,
+                
+            }
 
-            else:
-                return {"warning": "No books found"}
         else:
-            return all_books
+            return {"warning": "No books found"}
+     
 
     except Exception as e:
 
@@ -202,7 +199,7 @@ async def add_book(
     try:
         # print(book_name,writer,publisher,category,total_pages)
         user_id = request.cookies.get("id")  # get the user id
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
         id = str(uuid.uuid4())
         raw_bytes = await file.read()
@@ -284,7 +281,7 @@ async def add_book(
 async def get_books(user_id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
@@ -309,7 +306,7 @@ async def get_books(user_id: str):
 async def get_book(book_id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
@@ -331,7 +328,7 @@ async def get_book(book_id: str):
 async def delete_book(user_id: str, id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -351,7 +348,7 @@ async def delete_book(user_id: str, id: str):
 async def edit_book(new_book: BookUpdate, user_id: str, id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -379,7 +376,7 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
 async def setInRead(user_id: str, id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(
