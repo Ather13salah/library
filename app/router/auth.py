@@ -40,8 +40,8 @@ async def signup(user: UserToSignUp):
 
         return {"id":id,"acsses_token": token, "refresh_token": refresh_token}
 
-     except Exception as e:
-        return {"error": f"Can not create user {str(e}"}
+    except Exception as e:
+        return {"error": f"Can not create user {str(e)}"}
 
 
 @router.post("/login")
@@ -70,7 +70,7 @@ async def login(user: UserToLogin):
         return {"id":current_user['id'],"acsses_token": token, "refresh_token": refresh_token}
 
     except Exception as e:
-        return {"error": f"Can not Login{str(e} "}
+        return {"error": f"Can not Login{str(e)} "}
     
     
  
