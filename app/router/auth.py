@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Response
+from fastapi.responses import JSONResponse
 from app.router.user import UserToLogin, UserToSignUp
 from app.db import create_connection
 import bcrypt
@@ -8,7 +9,7 @@ import uuid
 router = APIRouter(prefix="/auth")
 
 @router.post("/signup")
-async def signup(user: UserToSignUp, response: Response):
+async def signup(user: UserToSignUp):
     try:
         conn = create_connection()
         cursor = conn.cursor()
@@ -34,6 +35,14 @@ async def signup(user: UserToSignUp, response: Response):
         cursor.close()
         conn.close()
 
+        response = JSONResponse(
+            content={
+                "id": user_id,
+                "access_token": token,
+                "refresh_token": refresh_token,
+            },
+            status_code=200
+        )
         # ✅ Set cookies
         cookie_opts = {"httponly": True, "secure": True, "samesite": "None", "path": "/"}
         response.set_cookie(key="token", value=token, **cookie_opts)
@@ -47,9 +56,6 @@ async def signup(user: UserToSignUp, response: Response):
             path="/",
         )
 
-        response.status_code = 201
-        response.media_type = "application/json"
-        response.body = b'{"message": "User created successfully"}'
 
         return response
 
@@ -76,6 +82,14 @@ async def login(user: UserToLogin, response: Response):
         if not token or not refresh_token:
             return {"error": "Cannot create token"}
 
+        response = JSONResponse(
+            content={
+                "id": current_user["id"],
+                "access_token": token,
+                "refresh_token": refresh_token,
+            },
+            status_code=200
+        )
         # ✅ Set cookies
         cookie_opts = {"httponly": True, "secure": True, "samesite": "None", "path": "/"}
         response.set_cookie(key="token", value=token, **cookie_opts)
@@ -88,10 +102,6 @@ async def login(user: UserToLogin, response: Response):
             samesite="None",
             path="/",
         )
-
-        response.status_code = 201
-        response.media_type = "application/json"
-        response.body = b'{"message": "User created successfully"}'
 
         return response
 
