@@ -47,7 +47,7 @@ async def signup(user: UserToSignUp, response: Response):
             path="/",
         )
 
-        return {"id": user_id, "access_token": token, "refresh_token": refresh_token}
+        return response
 
     except Exception as e:
         return {"error": f"Cannot create user: {str(e)}"}
@@ -85,7 +85,7 @@ async def login(user: UserToLogin, response: Response):
             path="/",
         )
 
-        return {"id": current_user["id"], "access_token": token, "refresh_token": refresh_token}
+        return response
 
     except Exception as e:
         return {"error": f"Cannot login: {str(e)}"}
