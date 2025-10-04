@@ -17,7 +17,7 @@ origins = [
     
 ]
 
-app.add_middleware(VerifyToken)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +26,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+app.add_middleware(VerifyToken)
 
 app.mount('/uploads',StaticFiles(directory='uploads'),name='uploads')
 app.include_router(auth.router)
