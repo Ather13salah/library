@@ -13,6 +13,7 @@ app = FastAPI() #this object from fast api to make
 
 origins = [
     "http://localhost:3000", 
+    "https://maktabty.vercel.app"
     
 ]
 
