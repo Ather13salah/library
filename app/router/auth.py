@@ -75,12 +75,20 @@ async def login(user: UserToLogin):
     
  
 @router.post('/logout')
-async def logout(response:Response):
+async def logout(response: Response):
     try:
-        response.delete_cookie('token')
-        response.delete_cookie('refresh_token')
-        response.delete_cookie('user_id')
-        
+        cookie_options = {
+            "httponly": True,
+            "samesite": "None",
+            "secure": True,
+            "path": "/"
+        }
+
+        response.delete_cookie("token", **cookie_options)
+        response.delete_cookie("refresh_token", **cookie_options)
+        response.delete_cookie("user_id", **cookie_options)
+
         return {"message": "Logged out successfully"}
-    except:
-        return {"error":"Can not log out"}
+    except Exception as e:
+        return {"error": f"Can not log out: "}
+
