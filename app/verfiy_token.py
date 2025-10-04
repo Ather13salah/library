@@ -27,8 +27,7 @@ class VerifyToken(BaseHTTPMiddleware):
 
         token = request.cookies.get("token")
         refresh_token = request.cookies.get("refresh_token")
-
-        # 1) Try access token
+        print(f'Token:{token} and Referesh Token: {refresh_token}')# 1) Try access token
         payload = self.decode_token(token)
         if payload:
             request.state.user = payload.get("sub")
