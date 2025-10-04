@@ -47,6 +47,10 @@ async def signup(user: UserToSignUp, response: Response):
             path="/",
         )
 
+        response.status_code = 201
+        response.media_type = "application/json"
+        response.body = b'{"message": "User created successfully"'
+
         return response
 
     except Exception as e:
@@ -84,6 +88,10 @@ async def login(user: UserToLogin, response: Response):
             samesite="None",
             path="/",
         )
+
+        response.status_code = 201
+        response.media_type = "application/json"
+        response.body = b'{"message": "User created successfully"'
 
         return response
 
