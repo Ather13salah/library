@@ -288,7 +288,7 @@ async def get_books(user_id: str):
         if not books:
             return {"error": "No books found "}
 
-        print("DEBUG: Found books count =", len(books))
+        print(f"DEBUG: Found books count ={books}")
 
         return {"books": books}
 
