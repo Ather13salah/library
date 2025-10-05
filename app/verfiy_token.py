@@ -27,6 +27,7 @@ class VerifyToken(BaseHTTPMiddleware):
 
         token = request.cookies.get("token")
         refresh_token = request.cookies.get("refresh_token")
+        print(f"Token:{token} and Refresh Token:{refresh_token}")
 
         payload = self.decode_token(token)
         if payload:
