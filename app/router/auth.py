@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response,Request
+from jose import jwt ,JWTError,ExpiredSignatureError
 from fastapi.responses import JSONResponse
 from app.router.user import UserToLogin, UserToSignUp
 from app.db import create_connection
 import bcrypt
 from app.tokens import create_access_token
 import uuid
+import os
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/auth")
 
+
 @router.post("/signup")
-async def signup(user: UserToSignUp):
+async def signup(user: UserToSignUp, response: Response):
     try:
         conn = create_connection()
         cursor = conn.cursor()
@@ -35,17 +39,24 @@ async def signup(user: UserToSignUp):
         cursor.close()
         conn.close()
 
-        response = JSONResponse(
-            content={
-                "ok":True,
-                "id": user_id,
-                "access_token": token,
-                "refresh_token": refresh_token,
-            },
-            status_code=200
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=True,
+            samesite="None",
+            max_age=3600,
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="None",
+            max_age=43200,
         )
 
-        return response
+        return {"id": user_id, "message": "Loggedin"}
 
     except Exception as e:
         return {"error": f"Cannot create user:"}
@@ -61,7 +72,9 @@ async def login(user: UserToLogin, response: Response):
         if not current_user:
             return {"error": "Username not found"}
 
-        if not bcrypt.checkpw(user.password.encode("utf-8"), current_user["user_password"].encode("utf-8")):
+        if not bcrypt.checkpw(
+            user.password.encode("utf-8"), current_user["user_password"].encode("utf-8")
+        ):
             return {"error": "Invalid username or password"}
 
         token = create_access_token({"sub": user.name}, 60)
@@ -70,18 +83,49 @@ async def login(user: UserToLogin, response: Response):
         if not token or not refresh_token:
             return {"error": "Cannot create token"}
 
-        response = JSONResponse(
-            content={
-                "ok":True,
-                "id": current_user["id"],
-                "access_token": token,
-                "refresh_token": refresh_token,
-            },
-            status_code=200
+        response.set_cookie(
+            key="token",
+            value=token,
+            httponly=True,
+            secure=True,
+            samesite="None",
+            max_age=3600,
         )
-    
-        return response
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="None",
+            max_age=43200,
+        )
+
+        return {"id": current_user["id"], "message": "Loggedin"}
 
     except Exception as e:
         return {"error": f"Cannot login"}
 
+
+@router.get("/me")
+async def get_me(request: Request):
+    token = request.cookies.get("token")
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not token and not refresh_token:
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+
+    try:
+        payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")])
+        return {"user": payload.get("sub"), "status": "active"}
+    except ExpiredSignatureError:
+        # انتهت صلاحية الـ access token → نحاول نستخدم refresh
+        try:
+            refresh_payload = jwt.decode(refresh_token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")])
+            new_token = create_access_token({"sub": refresh_payload.get("sub")}, minutes=60)
+            response = JSONResponse({"user": refresh_payload.get("sub"), "new_token": new_token})
+            response.set_cookie(key="token", value=new_token, httponly=True, samesite="None", secure=True)
+            return response
+        except Exception:
+            return JSONResponse({"detail": "Session expired"}, status_code=401)
+    except JWTError:
+        return JSONResponse({"detail": "Invalid token"}, status_code=401)
