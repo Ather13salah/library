@@ -183,7 +183,7 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
 
     except Exception as e:
 
-        return {"error": f"Can not add the book: "}
+        return {"error": f"Can not add the book:{str(e)} "}
 
 
 @router.post("/add-book")
