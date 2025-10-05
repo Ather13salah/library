@@ -44,19 +44,6 @@ async def signup(user: UserToSignUp):
             },
             status_code=200
         )
-        # ✅ Set cookies
-        cookie_opts = {"httponly": True, "secure": True, "samesite": "None", "path": "/"}
-        response.set_cookie(key="token", value=token, **cookie_opts)
-        response.set_cookie(key="refresh_token", value=refresh_token, **cookie_opts)
-        response.set_cookie(
-            key="user_id",
-            value=user_id,
-            httponly=False,
-            secure=True,
-            samesite="None",
-            path="/",
-        )
-
 
         return response
 
@@ -92,32 +79,10 @@ async def login(user: UserToLogin, response: Response):
             },
             status_code=200
         )
-        # ✅ Set cookies
-        cookie_opts = {"httponly": True, "secure": True, "samesite": "None", "path": "/"}
-        response.set_cookie(key="token", value=token, **cookie_opts)
-        response.set_cookie(key="refresh_token", value=refresh_token, **cookie_opts)
-        response.set_cookie(
-            key="user_id",
-            value=current_user["id"],
-            httponly=False,
-            secure=True,
-            samesite="None",
-            path="/",
-        )
+    
         print(f"Response is: {response}")
         return response
 
     except Exception as e:
         return {"error": f"Cannot login: {str(e)}"}
 
-
-@router.post("/logout")
-async def logout(response: Response):
-    try:
-        cookie_opts = {"httponly": True, "samesite": "None", "secure": True, "path": "/"}
-        response.delete_cookie("token", **cookie_opts)
-        response.delete_cookie("refresh_token", **cookie_opts)
-        response.delete_cookie("user_id", **cookie_opts)
-        return {"message": "Logged out successfully"}
-    except Exception as e:
-        return {"error": f"Cannot log out: {str(e)}"}
