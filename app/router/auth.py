@@ -37,6 +37,7 @@ async def signup(user: UserToSignUp):
 
         response = JSONResponse(
             content={
+                "ok":True,
                 "id": user_id,
                 "access_token": token,
                 "refresh_token": refresh_token,
@@ -84,6 +85,7 @@ async def login(user: UserToLogin, response: Response):
 
         response = JSONResponse(
             content={
+                "ok":True,
                 "id": current_user["id"],
                 "access_token": token,
                 "refresh_token": refresh_token,
