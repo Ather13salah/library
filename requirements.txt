@@ -7,5 +7,5 @@ mysql-connector-python
 requests
 pillow
 numpy
-google-generativeai   
+openai   
 python-multipart
