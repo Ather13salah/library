@@ -48,7 +48,7 @@ async def signup(user: UserToSignUp):
         return response
 
     except Exception as e:
-        return {"error": f"Cannot create user: {str(e)}"}
+        return {"error": f"Cannot create user:"}
 
 
 @router.post("/login")
@@ -80,9 +80,8 @@ async def login(user: UserToLogin, response: Response):
             status_code=200
         )
     
-        print(f"Response is: {response}")
         return response
 
     except Exception as e:
-        return {"error": f"Cannot login: {str(e)}"}
+        return {"error": f"Cannot login"}
 
