@@ -42,9 +42,9 @@ prompt = """
 """
 
 @router.post("/upload-book")
-async def extract_text(request: Request, file: UploadFile = File(...)):
+async def extract_text(request: Request,user_id:str, file: UploadFile = File(...)):
     try:
-        user_id = request.cookies.get("id")
+       
         conn = create_connection()
         cursor = conn.cursor()
 
@@ -182,6 +182,7 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
 @router.post("/add-book")
 async def add_book(
     request: Request,
+    user_id: str,
     book_name: str = Form(...),
     writer: str = Form(...),
     publisher: str = Form(...),
