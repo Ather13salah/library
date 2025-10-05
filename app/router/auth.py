@@ -28,7 +28,7 @@ async def signup(user: UserToSignUp, response: Response):
         if not token or not refresh_token:
             return {"error": "Cannot create user"}
 
-        hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
+        hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode('utf-8')
         user_id = str(uuid.uuid4())
 
         cursor.execute(
@@ -150,6 +150,7 @@ async def get_me(request: Request):
 @router.post("/logout")
 async def logout(response: Response):
     try:
+        response = JSONResponse(content={'message':"Logged out Successfully"})
         response.delete_cookie(
             key="token",
             httponly=True,
@@ -162,6 +163,7 @@ async def logout(response: Response):
             secure=True,
             samesite="None",
         )
+        return response
     except:
         return {"error":"Can not logout "}
     
