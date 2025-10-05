@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Response,Request
-from jose import jwt ,JWTError,ExpiredSignatureError
+from fastapi import APIRouter, Response, Request
+from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi.responses import JSONResponse
 from app.router.user import UserToLogin, UserToSignUp
 from app.db import create_connection
@@ -115,17 +115,53 @@ async def get_me(request: Request):
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
 
     try:
-        payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")])
+        payload = jwt.decode(
+            token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")]
+        )
         return {"user": payload.get("sub"), "status": "active"}
     except ExpiredSignatureError:
         # انتهت صلاحية الـ access token → نحاول نستخدم refresh
         try:
-            refresh_payload = jwt.decode(refresh_token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")])
-            new_token = create_access_token({"sub": refresh_payload.get("sub")}, minutes=60)
-            response = JSONResponse({"user": refresh_payload.get("sub"), "new_token": new_token})
-            response.set_cookie(key="token", value=new_token, httponly=True, samesite="None", secure=True)
+            refresh_payload = jwt.decode(
+                refresh_token,
+                os.getenv("SECRET_KEY"),
+                algorithms=[os.getenv("ALGORITHM")],
+            )
+            new_token = create_access_token(
+                {"sub": refresh_payload.get("sub")}, minutes=60
+            )
+            response = JSONResponse(
+                {"user": refresh_payload.get("sub"), "new_token": new_token}
+            )
+            response.set_cookie(
+                key="token",
+                value=new_token,
+                httponly=True,
+                samesite="None",
+                secure=True,
+            )
             return response
         except Exception:
             return JSONResponse({"detail": "Session expired"}, status_code=401)
     except JWTError:
         return JSONResponse({"detail": "Invalid token"}, status_code=401)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    try:
+        response.delete_cookie(
+            key="token",
+            httponly=True,
+            secure=True,
+            samesite="None",
+        )
+        response.delete_cookie(
+            key="refresh_token",
+            httponly=True,
+            secure=True,
+            samesite="None",
+        )
+    except:
+        return {"error":"Can not logout "}
+    
