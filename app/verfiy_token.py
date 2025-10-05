@@ -24,7 +24,7 @@ class VerifyToken(BaseHTTPMiddleware):
         path = request.url.path
         if not path.startswith("/protected"):
             return await call_next(request)
-
+        print(f'Cookies:{request.cookies}')
         token = request.cookies.get("token")
         refresh_token = request.cookies.get("refresh_token")
         print(f"Token:{token} and Refresh Token:{refresh_token}")
