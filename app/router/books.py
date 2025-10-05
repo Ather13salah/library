@@ -277,7 +277,7 @@ async def get_books(user_id: str):
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT id, book_name, image_url,is_in_daily,is_favourite,is_read,category FROM books WHERE user_id = %s",
+            "SELECT id, book_name, image_url,is_in_daily,is_favourite,category FROM books WHERE user_id = %s",
             (user_id,),
         )
         books = cursor.fetchall()
@@ -287,6 +287,8 @@ async def get_books(user_id: str):
 
         if not books:
             return {"error": "No books found "}
+
+        print("DEBUG: Found books count =", len(books))
 
         return {"books": books}
 
@@ -310,6 +312,7 @@ async def get_book(book_id: str):
         if not book:
             return {"error": "No books found "}
 
+        
         return {"book": book}
 
     except Exception as e:
