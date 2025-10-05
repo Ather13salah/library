@@ -284,11 +284,12 @@ async def get_books(user_id: str):
 
         cursor.close()
         conn.close()
+        print(f"Books:{books}")
 
         if not books:
             return {"error": "No books found "}
 
-        print(f"DEBUG: Found books count ={books}")
+        
 
         return {"books": books}
 
