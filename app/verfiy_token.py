@@ -5,14 +5,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.tokens import create_access_token
 import os
 
+
 class VerifyToken(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)
         self.secret_key = os.getenv("SECRET_KEY")
         self.algorithm = os.getenv("ALGORITHM")
-     
 
     def decode_token(self, token):
+        """Decode JWT token safely"""
         if not token:
             return None
         try:
@@ -22,30 +23,38 @@ class VerifyToken(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+
+        # ✅ 1) Allow all OPTIONS requests to pass (for CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # ✅ 2) Allow public endpoints (not protected)
         if not path.startswith("/protected"):
             return await call_next(request)
-        
+
+        # ✅ 3) Get cookies
         token = request.cookies.get("token")
         refresh_token = request.cookies.get("refresh_token")
-        
+
+        # ✅ 4) Verify access token
         payload = self.decode_token(token)
         if payload:
             request.state.user = payload.get("sub")
             return await call_next(request)
 
-        # 2) If access token missing/expired, try refresh
+        # ✅ 5) If access expired, try refresh
         payload_refresh = self.decode_token(refresh_token)
         if payload_refresh:
             user = payload_refresh.get("sub")
-            # create new access token
+
+            # create a new access token
             new_token = create_access_token({"sub": user}, minutes=60)
-            # attach user to request so downstream handlers know the user
             request.state.user = user
 
-            # call endpoints
+            # continue request
             response = await call_next(request)
 
-            # set cookie on response for future requests
+            # set new cookie
             response.set_cookie(
                 key="token",
                 value=new_token,
@@ -53,9 +62,9 @@ class VerifyToken(BaseHTTPMiddleware):
                 max_age=3600,
                 samesite="None",
                 secure=True,
-                path="/"
+                path="/",
             )
             return response
 
-        # 3) neither token nor valid refresh -> unauthorized
+        # ✅ 6) If both invalid
         return JSONResponse({"invalid_token": "/login"}, status_code=401)
