@@ -102,7 +102,7 @@ async def login(user: UserToLogin, response: Response):
             samesite="None",
             path="/",
         )
-
+        print(f"Response is: {response}")
         return response
 
     except Exception as e:
