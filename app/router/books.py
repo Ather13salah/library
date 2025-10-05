@@ -76,7 +76,7 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
 
         # 2️⃣ إرسال الصورة إلى OpenAI OCR
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # نموذج قوي لمعالجة الصور
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": prompt},
                 {
@@ -85,12 +85,13 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
                         {"type": "text", "text": prompt},
                         {
                             "type": "image_url",
-                            "image_url": f"data:image/jpeg;base64,{image_b64}"
+                            "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
                         },
                     ],
                 },
             ],
         )
+
 
         raw_text = response.choices[0].message.content.strip()
 
