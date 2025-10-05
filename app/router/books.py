@@ -2,63 +2,62 @@ from PIL import Image, ImageEnhance
 import numpy as np
 import os
 import requests
-from fastapi import APIRouter, Request, UploadFile, File, Form
+from fastapi import APIRouter, Request, UploadFile, File,Form
 from fastapi.staticfiles import StaticFiles
 import uuid
-import google.generativeai as genai
+from openai import OpenAI
 from app.db import create_connection
 from dotenv import load_dotenv
 import base64
 from io import BytesIO
 from pathlib import Path
 import json
-from app.router.get_data_from_local_db import get_data
 from app.router.book_update import BookUpdate
 from app.router import favourite, daily
-
 
 router = APIRouter(prefix="/books")
 router.include_router(favourite.router)
 router.include_router(daily.router)
 
-
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-# إضافة static route
 router.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 load_dotenv()
-genai.configure(api_key=os.getenv("API_KEY_FOR_GEMINI_AI"))
+
+# ✅ إعداد عميل OpenAI
+openai_api_key = os.getenv("API_KEY_FOR_OPEN_AI")
+client = OpenAI(api_key=openai_api_key)
+
+# مفتاح Google Books
 api_key = os.getenv("API_KEY_FOR_GOOGLE_BOOKS_API")
 
 prompt = """
-أنت OCR متخصص.  
-استخرج فقط عنوان الكتاب والتصنيف من الغلاف.  
-لو التصنيف غير موجود في الصورة، ابحث أونلاين باستخدام العنوان وحدد التصنيف.  
+أنت متخصص OCR.
+استخرج فقط عنوان الكتاب والتصنيف من الغلاف.
+لو التصنيف غير موجود في الصورة، ابحث أونلاين باستخدام العنوان وحدد التصنيف.
 أرجع النتيجة في JSON فقط، هكذا:
 
 {"book_name": "...", "category": "..."}
-
 """
- 
 
 @router.post("/upload-book")
 async def extract_text(request: Request, file: UploadFile = File(...)):
     try:
-        user_id = request.cookies.get("id")  # get the user id
+        user_id = request.cookies.get("id")
         conn = create_connection()
         cursor = conn.cursor()
-        # 1) قراءة الملف كـ bytes
-        raw_bytes = await file.read()
 
-        # 2) افتح الصورة وحوّلها RGB
+        # 1) قراءة الصورة
+        raw_bytes = await file.read()
         image = Image.open(BytesIO(raw_bytes)).convert("RGB")
 
+        # تحسين الصورة قليلاً
         image = ImageEnhance.Brightness(image).enhance(1.02)
         image = ImageEnhance.Contrast(image).enhance(1.05)
         image = ImageEnhance.Sharpness(image).enhance(1.1)
 
-        # 4) تنظيف الخلفية
+        # تنظيف الخلفية البيضاء
         np_img = np.array(image)
         threshold = 240
         mask = (
@@ -69,85 +68,81 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
         np_img[mask] = [255, 255, 255]
         image = Image.fromarray(np_img)
 
-        # 5) حفظ الصورة في buffer
+        # تحويلها base64
         buffer = BytesIO()
         image.save(buffer, format="JPEG")
         processed_bytes = buffer.getvalue()
-
-        # 6) إرسال الصورة إلى Gemini OCR
         image_b64 = base64.b64encode(processed_bytes).decode("utf-8")
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(
-            [prompt, {"mime_type": file.content_type, "data": image_b64}]
+
+        # 2️⃣ إرسال الصورة إلى OpenAI OCR
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # نموذج قوي لمعالجة الصور
+            messages=[
+                {"role": "system", "content": prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": f"data:image/jpeg;base64,{image_b64}"
+                        },
+                    ],
+                },
+            ],
         )
-        raw_text = response.candidates[0].content.parts[0].text.strip()
+
+        raw_text = response.choices[0].message.content.strip()
 
         title_text = ""
         category_text = "غير معروف"
 
         try:
             raw_text_clean = raw_text.strip()
-
-            # 🛠️ لو الاستجابة فيها ```json أو ```
             if raw_text_clean.startswith("```"):
                 raw_text_clean = raw_text_clean.strip("`")
-                # ممكن يكون فيها json: في البداية
                 if raw_text_clean.lower().startswith("json"):
                     raw_text_clean = raw_text_clean[4:].strip()
 
             parsed = json.loads(raw_text_clean)
-
             title_text = parsed.get("book_name", "").strip()
             category_text = parsed.get("category", "")
-
-        except json.JSONDecodeError as e:
-            # Gemini رجع نص مش JSON
-            title_text = raw_text or "UnKnown Title"
+        except json.JSONDecodeError:
+            title_text = raw_text or "Unknown Title"
             category_text = "غير معروف"
 
+        # حفظ الصورة
         filename = f"{uuid.uuid4()}.jpg"
         out_path = UPLOAD_DIR / filename
         with open(out_path, "wb") as f:
             f.write(processed_bytes)
         image_return = f"{request.base_url}uploads/{filename}"
 
-        # 8) الاستعلام من Google Books
-        cursor.execute("select book_name from books where user_id = %s", (user_id,))
+        # تحقق من وجود الكتاب مسبقاً
+        cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
         books = cursor.fetchall()
         for book_name in books:
             if title_text == book_name[0]:
-                return {"error": "Book name is already exists"}
+                return {"error": "Book name already exists"}
 
+        # استعلام Google Books API
         query = requests.utils.requote_uri(title_text or "")
         url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
         gres = requests.get(url, timeout=10)
         gdata = gres.json()
 
         if gdata.get("totalItems", 0) != 0:
-
-            # 10) تجهيز بيانات الكتاب
             id = str(uuid.uuid4())
-
-            authors = (
-                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("authors")
-            ) or ["غير معروف"]
-            writer = authors[0] if authors else "غير معروف"
-
-            publisher = (
-                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("publisher")
-            ) or "غير معروف"
-            total_pages = (
-                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("pageCount")
-            ) or 0
-
-            # 11) إدخال البيانات في MySQL (لاحظ إضافة category)
+            authors = gdata.get("items", [{}])[0].get("volumeInfo", {}).get("authors") or ["غير معروف"]
+            writer = authors[0]
+            publisher = gdata.get("items", [{}])[0].get("volumeInfo", {}).get("publisher") or "غير معروف"
+            total_pages = gdata.get("items", [{}])[0].get("volumeInfo", {}).get("pageCount") or 0
 
             cursor.execute(
                 """
                 INSERT INTO books (
-                    id, book_name, writer,
-                    book_type, publisher, total_pages,
-                    image_url, user_id, category
+                    id, book_name, writer, book_type,
+                    publisher, total_pages, image_url, user_id, category
                 ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
@@ -166,7 +161,6 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
             cursor.close()
             conn.close()
 
-            # 12) الرد للعميل
             return {
                 "id": id,
                 "book_name": title_text,
@@ -174,16 +168,14 @@ async def extract_text(request: Request, file: UploadFile = File(...)):
                 "image_url": image_return,
                 "is_in_daily": False,
                 "is_favourite": False,
-                
             }
 
         else:
             return {"warning": "No books found"}
-     
 
     except Exception as e:
+        return {"error": f"Cannot add the book: {str(e)}"}
 
-        return {"error": f"Can not add the book:{str(e)} "}
 
 
 @router.post("/add-book")
@@ -197,7 +189,6 @@ async def add_book(
     file: UploadFile = File(...),
 ):
     try:
-        # print(book_name,writer,publisher,category,total_pages)
         user_id = request.cookies.get("id")  # get the user id
         conn = create_connection()
         cursor = conn.cursor()
@@ -372,21 +363,4 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         return {"error": f"Can not Edit the book {str(e)} "}
 
 
-@router.patch("/set-book-read")
-async def setInRead(user_id: str, id: str):
-    try:
 
-        conn = create_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "update books set is_read = True WHERE user_id = %s and id = %s",
-            (user_id, id),
-        )
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return {"done": "Book read "}
-
-    except Exception as e:
-        return {"error": "Can not set book from reading books"}
