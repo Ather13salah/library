@@ -310,7 +310,7 @@ async def get_books(user_id: str):
 
         cursor.close()
         conn.close()
-        print(f"Books:{books}")
+        # print(f"Books:{books}")
        
 
         if not books or books == []:
