@@ -136,8 +136,8 @@ async def get_me(request: Request):
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
 
     try:
-        if token == None:
-            check_refresh(refresh_token)
+        if token is None:
+            return check_refresh(refresh_token)
         payload = jwt.decode(
             token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")]
         )
@@ -145,7 +145,7 @@ async def get_me(request: Request):
     except ExpiredSignatureError:
         # انتهت صلاحية الـ access token → نحاول نستخدم refresh
         try:
-           check_refresh(refresh_token)
+           return check_refresh(refresh_token)
         except Exception:
             return JSONResponse({"detail": "Session expired"}, status_code=401)
     except JWTError:
