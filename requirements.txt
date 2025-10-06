@@ -7,5 +7,6 @@ mysql-connector-python
 requests
 pillow
 numpy
-openai   
+openai
 python-multipart
+cloudinary
