@@ -1,4 +1,3 @@
-from fastapi.staticfiles import StaticFiles
 from app.router import auth
 from app.router import protected
 from app.verfiy_token import VerifyToken
@@ -18,7 +17,6 @@ origins = [
 ]
 
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -28,6 +26,5 @@ app.add_middleware(
 )
 app.add_middleware(VerifyToken)
 
-app.mount('/uploads',StaticFiles(directory='uploads'),name='uploads')
 app.include_router(auth.router)
 app.include_router(protected.router)
