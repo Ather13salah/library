@@ -171,8 +171,7 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
                 INSERT INTO books (
                     id, book_name, writer, book_type,
                     publisher, total_pages, image_url, user_id, category
-                    id, book_name, writer, book_type,
-                    publisher, total_pages, image_url, user_id, category
+                    
                 ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
@@ -305,7 +304,6 @@ async def get_books(user_id: str):
 
         cursor.execute(
             "SELECT id, book_name, image_url,is_in_daily,is_favourite,category FROM books WHERE user_id = %s",
-            "SELECT id, book_name, image_url,is_in_daily,is_favourite,category FROM books WHERE user_id = %s",
             (user_id,),
         )
         books = cursor.fetchall()
@@ -313,7 +311,7 @@ async def get_books(user_id: str):
         cursor.close()
         conn.close()
         print(f"Books:{books}")
-        print(f"Books:{books}")
+       
 
         if not books:
             return {"error": "No books found "}
