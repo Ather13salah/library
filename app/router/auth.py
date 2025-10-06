@@ -9,9 +9,9 @@ import uuid
 import os
 from dotenv import load_dotenv
 
+
 load_dotenv()
 router = APIRouter(prefix="/auth")
-
 
 @router.post("/signup")
 async def signup(user: UserToSignUp, response: Response):
@@ -106,8 +106,28 @@ async def login(user: UserToLogin, response: Response):
     except Exception as e:
         return {"error": f"Cannot login"}
 
+def check_refresh(refresh_token):
+    refresh_payload = jwt.decode(
+        refresh_token,
+        os.getenv("SECRET_KEY"),
+        algorithms=[os.getenv("ALGORITHM")],
+    )
+    new_token = create_access_token(
+        {"sub": refresh_payload.get("sub")}, minutes=60
+    )
+    response = JSONResponse(
+        {"user": refresh_payload.get("sub"), "new_token": new_token}
+        )
+    response.set_cookie(
+        key="token",
+        value=new_token,
+        httponly=True,
+        samesite="None",
+        secure=True,
+    )
+    return response
 
-@router.get("/me")
+@router.get("/me") 
 async def get_me(request: Request):
     token = request.cookies.get("token")
     refresh_token = request.cookies.get("refresh_token")
@@ -116,6 +136,8 @@ async def get_me(request: Request):
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
 
     try:
+        if token == None:
+            check_refresh(refresh_token)
         payload = jwt.decode(
             token, os.getenv("SECRET_KEY"), algorithms=[os.getenv("ALGORITHM")]
         )
@@ -123,25 +145,7 @@ async def get_me(request: Request):
     except ExpiredSignatureError:
         # انتهت صلاحية الـ access token → نحاول نستخدم refresh
         try:
-            refresh_payload = jwt.decode(
-                refresh_token,
-                os.getenv("SECRET_KEY"),
-                algorithms=[os.getenv("ALGORITHM")],
-            )
-            new_token = create_access_token(
-                {"sub": refresh_payload.get("sub")}, minutes=60
-            )
-            response = JSONResponse(
-                {"user": refresh_payload.get("sub"), "new_token": new_token}
-            )
-            response.set_cookie(
-                key="token",
-                value=new_token,
-                httponly=True,
-                samesite="None",
-                secure=True,
-            )
-            return response
+           check_refresh(refresh_token)
         except Exception:
             return JSONResponse({"detail": "Session expired"}, status_code=401)
     except JWTError:
