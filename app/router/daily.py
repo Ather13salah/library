@@ -8,7 +8,7 @@ router = APIRouter(prefix='/daily')
 async def setInDaily(user_id: str, id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -22,14 +22,14 @@ async def setInDaily(user_id: str, id: str):
         return {"done": "Set the book in daily  "}
 
     except Exception as e:
-        return {"error": "Can not add the book in daily"}
+        return {"error": f"Can not add the book in daily {str(e)}"}
 
 
 @router.get("/get-daily-books")
 async def get_books(user_id: str):
     try:
 
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
@@ -54,7 +54,7 @@ async def get_books(user_id: str):
 async def delete_from_daily(user_id: str, id: str):
     try:
         
-        conn = create_connection("library")
+        conn = create_connection()
         cursor = conn.cursor()
 
         cursor.execute(
