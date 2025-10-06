@@ -62,6 +62,7 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
         raw_bytes = await file.read()
         image = Image.open(BytesIO(raw_bytes)).convert("RGB")
 
+        image = ImageOps.exif_transpose(image)
         # تحسين الصورة قليلاً
         # تحسين الصورة قليلاً
         image = ImageEnhance.Brightness(image).enhance(1.02)
@@ -228,6 +229,7 @@ async def add_book(
         # 2) افتح الصورة وحوّلها RGB
         image = Image.open(BytesIO(raw_bytes)).convert("RGB")
 
+        image = ImageOps.exif_transpose(image)
         image = ImageEnhance.Brightness(image).enhance(1.02)
         image = ImageEnhance.Contrast(image).enhance(1.05)
         image = ImageEnhance.Sharpness(image).enhance(1.1)
