@@ -313,7 +313,7 @@ async def get_books(user_id: str):
         print(f"Books:{books}")
        
 
-        if not books:
+        if not books or books == []:
             return {"error": "No books found "}
 
         
