@@ -374,6 +374,13 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         conn = create_connection()
         cursor = conn.cursor()
 
+        
+        cursor.execute("select book_name from books where user_id = %s", (user_id,))
+        books = cursor.fetchall()
+        for name in books:
+            if new_book.book_name == name[0]:
+                return {"error": "Book name is already exists"}
+            
         cursor.execute(
             "update books set book_name = %s, writer = %s, publisher = %s, category = %s ,total_pages = %s WHERE user_id = %s and id = %s",
             (
