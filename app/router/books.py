@@ -11,18 +11,19 @@ from app.db import create_connection
 from dotenv import load_dotenv
 import base64
 from io import BytesIO
-
 import json
 from app.router.book_update import BookUpdate
 from app.router import favourite, daily
 
+# -----------------------------
+# إعداد الراوتر والتهيئة
+# -----------------------------
 router = APIRouter(prefix="/books")
 router.include_router(favourite.router)
 router.include_router(daily.router)
 
 load_dotenv()
 
-# ✅ إعداد عميل OpenAI
 openai_api_key = os.getenv("API_KEY_FOR_OPEN_AI")
 client = OpenAI(api_key=openai_api_key)
 
@@ -33,42 +34,31 @@ cloudinary.config(
     secure=True,
 )
 
-api_key = os.getenv("API_KEY_FOR_GOOGLE_BOOKS_API")
-
+# -----------------------------
+# الـ Prompt الخاص بـ OCR
+# -----------------------------
 prompt = """
 أنت متخصص OCR.
 استخرج فقط عنوان الكتاب والتصنيف من الغلاف.
 لو التصنيف غير موجود في الصورة، ابحث أونلاين باستخدام العنوان وحدد التصنيف.
-أنت متخصص OCR.
-استخرج فقط عنوان الكتاب والتصنيف من الغلاف.
-لو التصنيف غير موجود في الصورة، ابحث أونلاين باستخدام العنوان وحدد التصنيف.
 أرجع النتيجة في JSON فقط، هكذا:
-
 {"book_name": "...", "category": "..."}
 """
 
-
+# -----------------------------
+# رفع صورة الكتاب وتحليلها
+# -----------------------------
 @router.post("/upload-book")
-async def extract_text(request: Request, user_id: str, file: UploadFile = File(...)):
+async def extract_text(file: UploadFile = File(...)):
     try:
-
-        conn = create_connection()
-        cursor = conn.cursor()
-
-        # 1) قراءة الصورة
-
-        # 1) قراءة الصورة
         raw_bytes = await file.read()
         image = Image.open(BytesIO(raw_bytes)).convert("RGB")
 
-        image = ImageOps.exif_transpose(image)
-        # تحسين الصورة قليلاً
-        # تحسين الصورة قليلاً
+        # تحسين الصورة
         image = ImageEnhance.Brightness(image).enhance(1.02)
         image = ImageEnhance.Contrast(image).enhance(1.05)
         image = ImageEnhance.Sharpness(image).enhance(1.1)
 
-        # تنظيف الخلفية البيضاء
         # تنظيف الخلفية البيضاء
         np_img = np.array(image)
         threshold = 240
@@ -80,15 +70,14 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
         np_img[mask] = [255, 255, 255]
         image = Image.fromarray(np_img)
 
-        # تحويلها base64
-        # تحويلها base64
+        # تحويل الصورة إلى base64
         buffer = BytesIO()
         image.save(buffer, format="JPEG")
         processed_bytes = buffer.getvalue()
         image_b64 = base64.b64encode(processed_bytes).decode("utf-8")
 
+        # إرسال إلى OpenAI OCR
         try:
-            # 2️⃣ إرسال الصورة إلى OpenAI OCR
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -99,9 +88,7 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_b64}"
-                                },
+                                "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
                             },
                         ],
                     },
@@ -109,10 +96,9 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
             )
             raw_text = response.choices[0].message.content.strip()
         except:
-            return {"error": "Can not Upload book"}
+            return {"error": "Cannot upload book"}
 
-
-
+        # تحليل الرد
         title_text = ""
         category_text = "غير معروف"
 
@@ -128,25 +114,13 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
             category_text = parsed.get("category", "")
         except json.JSONDecodeError:
             title_text = raw_text or "Unknown Title"
-        except json.JSONDecodeError:
-            title_text = raw_text or "Unknown Title"
-            category_text = "غير معروف"
 
+        # رفع الصورة إلى Cloudinary
         result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
         image_return = result.get("secure_url")
 
-        # تحقق من وجود الكتاب مسبقاً
-      
-        # تحقق من وجود الكتاب مسبقاً
-        cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
-        books = cursor.fetchall()
-        for book_name in books:
-            if title_text == book_name[0]:
-                return {"error": "Book name already exists"}
-                
-
-        # استعلام Google Books API
-        # استعلام Google Books API
+        # البحث في Google Books API
+        api_key = os.getenv("GOOGLE_BOOKS_API_KEY")
         query = requests.utils.requote_uri(title_text or "")
         url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
         gres = requests.get(url, timeout=10)
@@ -154,63 +128,74 @@ async def extract_text(request: Request, user_id: str, file: UploadFile = File(.
 
         if gdata.get("totalItems", 0) != 0:
             id = str(uuid.uuid4())
-            authors = gdata.get("items", [{}])[0].get("volumeInfo", {}).get(
-                "authors"
-            ) or ["غير معروف"]
+            volume_info = gdata.get("items", [{}])[0].get("volumeInfo", {})
+            authors = volume_info.get("authors") or ["غير معروف"]
             writer = authors[0]
-            publisher = (
-                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("publisher")
-                or "غير معروف"
-            )
-            total_pages = (
-                gdata.get("items", [{}])[0].get("volumeInfo", {}).get("pageCount") or 0
-            )
-
-            cursor.execute(
-                """
-                INSERT INTO books (
-                    id, book_name, writer, book_type,
-                    publisher, total_pages, image_url, user_id, category
-                    
-                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """,
-                (
-                    id,
-                    title_text,
-                    writer,
-                    "كتاب نصي",
-                    publisher,
-                    total_pages,
-                    image_return,
-                    user_id,
-                    category_text,
-                ),
-            )
-            conn.commit()
-            cursor.close()
-            conn.close()
+            publisher = volume_info.get("publisher", "غير معروف")
+            total_pages = volume_info.get("pageCount", 0)
 
             return {
                 "id": id,
                 "book_name": title_text,
                 "category": category_text,
                 "image_url": image_return,
+                "publisher": publisher,
+                "total_pages": total_pages,
+                "writer": writer,
                 "is_in_daily": False,
                 "is_favourite": False,
             }
 
-        else:
-            return {"warning": "No books found"}
+        return {"warning": "No books found"}
 
     except Exception as e:
         return {"error": f"Cannot add the book: {str(e)}"}
 
 
+# -----------------------------
+# إضافة بيانات الكتاب يدويًا
+# -----------------------------
+@router.post("/add-book-data")
+async def add_data(
+    user_id: str,
+    image_return: str = Form(...),
+    id: str = Form(...),
+    book_name: str = Form(...),
+    writer: str = Form(...),
+    publisher: str = Form(...),
+    category: str = Form(...),
+    total_pages: int = Form(...),
+):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
+    books = cursor.fetchall()
+    for name in books:
+        if book_name == name[0]:
+            return {"error": "Book name already exists"}
+
+    cursor.execute(
+        """
+        INSERT INTO books (
+            id, book_name, writer, book_type,
+            publisher, total_pages, image_url, user_id, category
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        (id, book_name, writer, "كتاب نصي", publisher, total_pages, image_return, user_id, category),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+# -----------------------------
+# رفع كتاب يدويًا مع صورة
+# -----------------------------
 @router.post("/add-book")
 async def add_book(
     request: Request,
     user_id: str,
-  
     book_name: str = Form(...),
     writer: str = Form(...),
     publisher: str = Form(...),
@@ -219,21 +204,16 @@ async def add_book(
     file: UploadFile = File(...),
 ):
     try:
-
         conn = create_connection()
         cursor = conn.cursor()
         id = str(uuid.uuid4())
         raw_bytes = await file.read()
 
-        # 2) افتح الصورة وحوّلها RGB
         image = Image.open(BytesIO(raw_bytes)).convert("RGB")
-
-        image = ImageOps.exif_transpose(image)
         image = ImageEnhance.Brightness(image).enhance(1.02)
         image = ImageEnhance.Contrast(image).enhance(1.05)
         image = ImageEnhance.Sharpness(image).enhance(1.1)
 
-        # 4) تنظيف الخلفية
         np_img = np.array(image)
         threshold = 240
         mask = (
@@ -244,7 +224,6 @@ async def add_book(
         np_img[mask] = [255, 255, 255]
         image = Image.fromarray(np_img)
 
-        # 5) حفظ الصورة في buffer
         buffer = BytesIO()
         image.save(buffer, format="JPEG")
         processed_bytes = buffer.getvalue()
@@ -252,31 +231,20 @@ async def add_book(
         result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
         image_return = result.get("secure_url")
 
-        cursor.execute("select book_name from books where user_id = %s", (user_id,))
+        cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
         books = cursor.fetchall()
         for name in books:
             if book_name == name[0]:
-                return {"error": "Book name is already exists"}
+                return {"error": "Book name already exists"}
 
         cursor.execute(
             """
             INSERT INTO books (
-                id, book_name, writer,
-                book_type,  publisher, total_pages,
-                image_url, user_id, category
+                id, book_name, writer, book_type, publisher,
+                total_pages, image_url, user_id, category
             ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
-            (
-                id,
-                book_name,
-                writer,
-                "كتاب نصي",
-                publisher,
-                total_pages,
-                image_return,
-                user_id,
-                category,
-            ),
+            (id, book_name, writer, "كتاب نصي", publisher, total_pages, image_return, user_id, category),
         )
         conn.commit()
         cursor.close()
@@ -293,75 +261,72 @@ async def add_book(
         }
 
     except Exception as e:
-        return {"error": f"Can not add the book: {str(e)}"}
+        return {"error": f"Cannot add the book: {str(e)}"}
 
 
+# -----------------------------
+# جلب جميع الكتب
+# -----------------------------
 @router.get("/get-books")
 async def get_books(user_id: str):
     try:
-
         conn = create_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            "SELECT * FROM books WHERE user_id = %s",
-            (user_id,),
-        )
+        cursor.execute("SELECT * FROM books WHERE user_id = %s", (user_id,))
         books = cursor.fetchall()
 
         cursor.close()
         conn.close()
-        # print(f"Books:{books}")
-       
 
-        if not books or books == []:
-            return {"error": "No books found "}
-
-        
-
+        if not books:
+            return {"error": "No books found"}
         return {"books": books}
 
-    except Exception as e:
-        return {"error": "Can not get Books"}
+    except Exception:
+        return {"error": "Cannot get Books"}
 
 
-
+# -----------------------------
+# حذف كتاب
+# -----------------------------
 @router.delete("/delete-book")
 async def delete_book(user_id: str, id: str):
     try:
-
         conn = create_connection()
         cursor = conn.cursor()
 
-        cursor.execute(
-            "delete FROM books WHERE user_id = %s and id = %s", (user_id, id)
-        )
-
+        cursor.execute("DELETE FROM books WHERE user_id = %s AND id = %s", (user_id, id))
         conn.commit()
         cursor.close()
         conn.close()
         return {"done": "Book Deleted Successfully"}
 
-    except Exception as e:
-        return {"error": "Can not delete the book"}
+    except Exception:
+        return {"error": "Cannot delete the book"}
 
 
+# -----------------------------
+# تعديل بيانات كتاب
+# -----------------------------
 @router.put("/edit-book")
 async def edit_book(new_book: BookUpdate, user_id: str, id: str):
     try:
-
         conn = create_connection()
         cursor = conn.cursor()
 
-        
-        cursor.execute("select book_name from books where user_id = %s", (user_id,))
+        cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
         books = cursor.fetchall()
         for name in books:
             if new_book.book_name == name[0]:
-                return {"error": "Book name is already exists"}
-            
+                return {"error": "Book name already exists"}
+
         cursor.execute(
-            "update books set book_name = %s, writer = %s, publisher = %s, category = %s ,total_pages = %s WHERE user_id = %s and id = %s",
+            """
+            UPDATE books
+            SET book_name = %s, writer = %s, publisher = %s, category = %s, total_pages = %s
+            WHERE user_id = %s AND id = %s
+            """,
             (
                 new_book.book_name,
                 new_book.writer,
@@ -378,4 +343,4 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         return {"done": "Book Edited"}
 
     except Exception as e:
-        return {"error": f"Can not Edit the book {str(e)} "}
+        return {"error": f"Cannot edit the book: {str(e)}"}
