@@ -145,8 +145,8 @@ async def extract_text(file: UploadFile = File(...)):
                 "is_in_daily": False,
                 "is_favourite": False,
             }
-
-        return {"warning": "No books found"}
+        else:
+            return {"warning": "No books found"}
 
     except Exception as e:
         return {"error": f"Cannot add the book: {str(e)}"}
