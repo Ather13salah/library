@@ -33,7 +33,7 @@ cloudinary.config(
     api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True,
 )
-
+api_key = os.getenv("GOOGLE_BOOKS_API_KEY")
 # -----------------------------
 # الـ Prompt الخاص بـ OCR
 # -----------------------------
@@ -102,7 +102,7 @@ async def extract_text(file: UploadFile = File(...)):
         title_text = ""
         category_text = "غير معروف"
 
-         try:
+        try:
             print(f"text:{raw_text}")
             
             title_text = raw_text.get("book_name", "").strip()
@@ -115,13 +115,14 @@ async def extract_text(file: UploadFile = File(...)):
         image_return = result.get("secure_url")
 
         # البحث في Google Books API
-        api_key = os.getenv("GOOGLE_BOOKS_API_KEY")
+   
         query = requests.utils.requote_uri(title_text or "")
         url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
         gres = requests.get(url, timeout=10)
         gdata = gres.json()
 
         if gdata.get("totalItems", 0) != 0:
+            print(gdata)
             id = str(uuid.uuid4())
             volume_info = gdata.get("items", [{}])[0].get("volumeInfo", {})
             authors = volume_info.get("authors") or ["غير معروف"]
