@@ -103,6 +103,7 @@ async def extract_text(file: UploadFile = File(...)):
         category_text = "غير معروف"
 
         try:
+            print(f"text:{raw_text}")
             raw_text_clean = raw_text.strip()
             if raw_text_clean.startswith("```"):
                 raw_text_clean = raw_text_clean.strip("`")
