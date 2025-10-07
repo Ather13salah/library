@@ -45,6 +45,7 @@ prompt = """
 {"book_name": "...", "category": "..."}
 """
 
+
 # -----------------------------
 # رفع صورة الكتاب وتحليلها
 # -----------------------------
@@ -88,7 +89,9 @@ async def extract_text(file: UploadFile = File(...)):
                             {"type": "text", "text": prompt},
                             {
                                 "type": "image_url",
-                                "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_b64}"
+                                },
                             },
                         ],
                     },
@@ -104,7 +107,7 @@ async def extract_text(file: UploadFile = File(...)):
 
         try:
             print(f"text:{raw_text}")
-            
+
             title_text = raw_text.get("book_name", "").strip()
             category_text = raw_text.get("category", "")
         except json.JSONDecodeError:
@@ -115,7 +118,7 @@ async def extract_text(file: UploadFile = File(...)):
         image_return = result.get("secure_url")
 
         # البحث في Google Books API
-   
+
         query = requests.utils.requote_uri(title_text or "")
         url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
         gres = requests.get(url, timeout=10)
@@ -142,7 +145,17 @@ async def extract_text(file: UploadFile = File(...)):
                 "is_favourite": False,
             }
         else:
-            return {"warning": "No books found"}
+            return {
+                "id": id,
+                "book_name": title_text,
+                "category": category_text,
+                "image_url": image_return,
+                "publisher": "غير معروف",
+                "total_pages": 0,
+                "writer": "غير معروف",
+                "is_in_daily": False,
+                "is_favourite": False,
+            }
 
     except Exception as e:
         return {"error": f"Cannot add the book: {str(e)}"}
@@ -178,7 +191,17 @@ async def add_data(
             publisher, total_pages, image_url, user_id, category
         ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
-        (id, book_name, writer, "كتاب نصي", publisher, total_pages, image_return, user_id, category),
+        (
+            id,
+            book_name,
+            writer,
+            "كتاب نصي",
+            publisher,
+            total_pages,
+            image_return,
+            user_id,
+            category,
+        ),
     )
     conn.commit()
     cursor.close()
@@ -240,7 +263,17 @@ async def add_book(
                 total_pages, image_url, user_id, category
             ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
-            (id, book_name, writer, "كتاب نصي", publisher, total_pages, image_return, user_id, category),
+            (
+                id,
+                book_name,
+                writer,
+                "كتاب نصي",
+                publisher,
+                total_pages,
+                image_return,
+                user_id,
+                category,
+            ),
         )
         conn.commit()
         cursor.close()
@@ -292,7 +325,9 @@ async def delete_book(user_id: str, id: str):
         conn = create_connection()
         cursor = conn.cursor()
 
-        cursor.execute("DELETE FROM books WHERE user_id = %s AND id = %s", (user_id, id))
+        cursor.execute(
+            "DELETE FROM books WHERE user_id = %s AND id = %s", (user_id, id)
+        )
         conn.commit()
         cursor.close()
         conn.close()
