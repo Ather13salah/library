@@ -7,7 +7,6 @@ import cloudinary
 import cloudinary.uploader
 import uuid
 from openai import OpenAI
-from openai import OpenAI
 from app.db import create_connection
 from dotenv import load_dotenv
 import base64
