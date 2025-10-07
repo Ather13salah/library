@@ -102,17 +102,11 @@ async def extract_text(file: UploadFile = File(...)):
         title_text = ""
         category_text = "غير معروف"
 
-        try:
+         try:
             print(f"text:{raw_text}")
-            raw_text_clean = raw_text.strip()
-            if raw_text_clean.startswith("```"):
-                raw_text_clean = raw_text_clean.strip("`")
-                if raw_text_clean.lower().startswith("json"):
-                    raw_text_clean = raw_text_clean[4:].strip()
-
-            parsed = json.loads(raw_text_clean)
-            title_text = parsed.get("book_name", "").strip()
-            category_text = parsed.get("category", "")
+            
+            title_text = raw_text.get("book_name", "").strip()
+            category_text = raw_text.get("category", "")
         except json.JSONDecodeError:
             title_text = raw_text or "Unknown Title"
 
