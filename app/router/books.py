@@ -305,7 +305,7 @@ async def get_books(user_id: str):
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT id, book_name, image_url,is_in_daily,is_favourite,category FROM books WHERE user_id = %s",
+            "SELECT * FROM books WHERE user_id = %s",
             (user_id,),
         )
         books = cursor.fetchall()
@@ -325,28 +325,6 @@ async def get_books(user_id: str):
     except Exception as e:
         return {"error": "Can not get Books"}
 
-
-@router.get("/get-book")
-async def get_book(book_id: str):
-    try:
-
-        conn = create_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
-        book = cursor.fetchone()
-
-        cursor.close()
-        conn.close()
-
-        if not book:
-            return {"error": "No books found "}
-
-        
-        return {"book": book}
-
-    except Exception as e:
-        return {"error": "Can not get Book"}
 
 
 @router.delete("/delete-book")
