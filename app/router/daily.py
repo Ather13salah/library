@@ -33,7 +33,7 @@ async def get_books(user_id: str):
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT id, book_name, image_url FROM books WHERE user_id = %s and is_in_daily = True",
+            "SELECT * FROM books WHERE user_id = %s and is_in_daily = True",
             (user_id,),
         )
         books = cursor.fetchall()
