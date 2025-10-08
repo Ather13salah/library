@@ -165,13 +165,13 @@ async def extract_text(file: UploadFile = File(...)):
 @router.post("/add-book-data")
 async def add_data(
     user_id: str,
-    image_return: str = Form(...),
     id: str = Form(...),
     book_name: str = Form(...),
     writer: str = Form(...),
     publisher: str = Form(...),
     category: str = Form(...),
     total_pages: int = Form(...),
+    image_return: str = Form(...)
 ):
     conn = create_connection()
     cursor = conn.cursor()
