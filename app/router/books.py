@@ -106,7 +106,7 @@ async def extract_text(file: UploadFile = File(...)):
         category_text = "غير معروف"
 
         try:
-           
+
             parsed = json.loads(raw_text)
             title_text = parsed.get("book_name", "").strip()
             category_text = parsed.get("category", "")
@@ -164,6 +164,7 @@ async def extract_text(file: UploadFile = File(...)):
 # إضافة بيانات الكتاب يدويًا
 # -----------------------------
 
+
 @router.post("/add-book-data")
 async def add_data(user_id: str, book: BookData):
     try:
@@ -198,9 +199,20 @@ async def add_data(user_id: str, book: BookData):
         conn.commit()
         cursor.close()
         conn.close()
-        return {"done": "Book added successfully"}
+        return {
+            "id": book.id,
+            "book_name": book.book_name,
+            "category": book.category,
+            "image_url": book.image_return,
+            "publisher": book.publisher,
+            "total_pages": book.total_pages,
+            "writer": book.writer,
+            "is_in_daily": False,
+            "is_favourite": False,
+        }
     except Exception as e:
-        return {"error":"Can not add the book"}
+        return {"error": "Can not add the book"}
+
 
 # -----------------------------
 # رفع كتاب يدويًا مع صورة
