@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 import base64
 from io import BytesIO
 import json
-from app.router.book_update import BookUpdate
+from app.router.book_update import BookData, BookUpdate
 from app.router import favourite, daily
 
 # -----------------------------
@@ -106,7 +106,7 @@ async def extract_text(file: UploadFile = File(...)):
         category_text = "غير معروف"
 
         try:
-            print(f"text:{raw_text}")
+           
             parsed = json.loads(raw_text)
             title_text = parsed.get("book_name", "").strip()
             category_text = parsed.get("category", "")
@@ -123,8 +123,10 @@ async def extract_text(file: UploadFile = File(...)):
         url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
         gres = requests.get(url, timeout=10)
         gdata = gres.json()
-        id = str(uuid.uuid4())
+
         if gdata.get("totalItems", 0) != 0:
+
+            id = str(uuid.uuid4())
             volume_info = gdata.get("items", [{}])[0].get("volumeInfo", {})
             authors = volume_info.get("authors") or ["غير معروف"]
             writer = authors[0]
@@ -162,49 +164,44 @@ async def extract_text(file: UploadFile = File(...)):
 # -----------------------------
 # إضافة بيانات الكتاب يدويًا
 # -----------------------------
+
 @router.post("/add-book-data")
-async def add_data(
-    user_id: str,
-    id: str = Form(...),
-    book_name: str = Form(...),
-    writer: str = Form(...),
-    publisher: str = Form(...),
-    category: str = Form(...),
-    total_pages: int = Form(...),
-    image_return: str = Form(...)
-):
-    conn = create_connection()
-    cursor = conn.cursor()
+async def add_data(user_id: str, book: BookData):
+    try:
+        conn = create_connection()
+        cursor = conn.cursor()
 
-    cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
-    books = cursor.fetchall()
-    for name in books:
-        if book_name == name[0]:
-            return {"error": "Book name already exists"}
+        cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
+        books = cursor.fetchall()
+        for name in books:
+            if book.book_name == name[0]:
+                return {"error": "Book name already exists"}
 
-    cursor.execute(
-        """
-        INSERT INTO books (
-            id, book_name, writer, book_type,
-            publisher, total_pages, image_url, user_id, category
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        """,
-        (
-            id,
-            book_name,
-            writer,
-            "كتاب نصي",
-            publisher,
-            total_pages,
-            image_return,
-            user_id,
-            category,
-        ),
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
-
+        cursor.execute(
+            """
+            INSERT INTO books (
+                id, book_name, writer, book_type,
+                publisher, total_pages, image_url, user_id, category
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """,
+            (
+                book.id,
+                book.book_name,
+                book.writer,
+                "كتاب نصي",
+                book.publisher,
+                book.total_pages,
+                book.image_return,
+                user_id,
+                book.category,
+            ),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"done": "Book added successfully"}
+    except Exception as e:
+        return {"error":"Can not add the book"}
 
 # -----------------------------
 # رفع كتاب يدويًا مع صورة
