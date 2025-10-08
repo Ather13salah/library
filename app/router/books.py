@@ -2,7 +2,7 @@ from PIL import Image, ImageEnhance
 import numpy as np
 import os
 import requests
-from fastapi import APIRouter, Request, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form
 import cloudinary
 import cloudinary.uploader
 import uuid
@@ -219,7 +219,6 @@ async def add_data(user_id: str, book: BookData):
 # -----------------------------
 @router.post("/add-book")
 async def add_book(
-    request: Request,
     user_id: str,
     book_name: str = Form(...),
     writer: str = Form(...),
@@ -290,11 +289,12 @@ async def add_book(
             "book_name": book_name,
             "category": category,
             "image_url": image_return,
+            "publisher": publisher,
+            "total_pages": total_pages,
+            "writer": writer,
             "is_in_daily": False,
             "is_favourite": False,
-            "is_read": False,
         }
-
     except Exception as e:
         return {"error": f"Cannot add the book: {str(e)}"}
 
