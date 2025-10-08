@@ -123,10 +123,9 @@ async def extract_text(file: UploadFile = File(...)):
         url = f"https://www.googleapis.com/books/v1/volumes?q={query}&key={api_key}"
         gres = requests.get(url, timeout=10)
         gdata = gres.json()
-
+         id = str(uuid.uuid4())
         if gdata.get("totalItems", 0) != 0:
 
-            id = str(uuid.uuid4())
             volume_info = gdata.get("items", [{}])[0].get("volumeInfo", {})
             authors = volume_info.get("authors") or ["غير معروف"]
             writer = authors[0]
