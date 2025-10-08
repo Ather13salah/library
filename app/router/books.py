@@ -352,11 +352,13 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         conn = create_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
-        books = cursor.fetchall()
-        for name in books:
-            if new_book.book_name == name[0]:
-                return {"error": "Book name already exists"}
+        cursor.execute(
+            "SELECT id FROM books WHERE user_id = %s AND book_name = %s AND id != %s",
+            (user_id, new_book.book_name, id),
+        )
+        existing = cursor.fetchone()
+        if existing:
+            return {"error": "Book name already exists"}
 
         cursor.execute(
             """
