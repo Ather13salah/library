@@ -225,35 +225,37 @@ async def add_book(
     publisher: str = Form(...),
     category: str = Form(...),
     total_pages: int = Form(...),
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
 ):
     try:
         conn = create_connection()
         cursor = conn.cursor()
         id = str(uuid.uuid4())
-        raw_bytes = await file.read()
-
-        image = Image.open(BytesIO(raw_bytes)).convert("RGB")
-        image = ImageEnhance.Brightness(image).enhance(1.02)
-        image = ImageEnhance.Contrast(image).enhance(1.05)
-        image = ImageEnhance.Sharpness(image).enhance(1.1)
-
-        np_img = np.array(image)
-        threshold = 240
-        mask = (
-            (np_img[:, :, 0] > threshold)
-            & (np_img[:, :, 1] > threshold)
-            & (np_img[:, :, 2] > threshold)
-        )
-        np_img[mask] = [255, 255, 255]
-        image = Image.fromarray(np_img)
-
-        buffer = BytesIO()
-        image.save(buffer, format="JPEG")
-        processed_bytes = buffer.getvalue()
-
-        result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
-        image_return = result.get("secure_url")
+        image_return = None
+        if file:
+            raw_bytes = await file.read()
+    
+            image = Image.open(BytesIO(raw_bytes)).convert("RGB")
+            image = ImageEnhance.Brightness(image).enhance(1.02)
+            image = ImageEnhance.Contrast(image).enhance(1.05)
+            image = ImageEnhance.Sharpness(image).enhance(1.1)
+    
+            np_img = np.array(image)
+            threshold = 240
+            mask = (
+                (np_img[:, :, 0] > threshold)
+                & (np_img[:, :, 1] > threshold)
+                & (np_img[:, :, 2] > threshold)
+            )
+            np_img[mask] = [255, 255, 255]
+            image = Image.fromarray(np_img)
+    
+            buffer = BytesIO()
+            image.save(buffer, format="JPEG")
+            processed_bytes = buffer.getvalue()
+    
+            result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
+            image_return = result.get("secure_url")
 
         cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
         books = cursor.fetchall()
