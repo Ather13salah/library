@@ -130,7 +130,6 @@ async def extract_text(file: UploadFile = File(...)):
             authors = volume_info.get("authors") or ["غير معروف"]
             writer = authors[0]
             publisher = volume_info.get("publisher", "غير معروف")
-            total_pages = volume_info.get("pageCount", 0)
 
             return {
                 "id": id,
@@ -138,7 +137,7 @@ async def extract_text(file: UploadFile = File(...)):
                 "category": category_text,
                 "image_url": image_return,
                 "publisher": publisher,
-                "total_pages": total_pages,
+                "total_pages": 1,
                 "writer": writer,
                 "is_in_daily": False,
                 "is_favourite": False,
@@ -150,7 +149,7 @@ async def extract_text(file: UploadFile = File(...)):
                 "category": category_text,
                 "image_url": image_return,
                 "publisher": "غير معروف",
-                "total_pages": 0,
+                "total_pages": 1,
                 "writer": "غير معروف",
                 "is_in_daily": False,
                 "is_favourite": False,
