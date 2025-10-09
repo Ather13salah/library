@@ -1,4 +1,4 @@
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance,ImageOps
 import numpy as np
 import os
 import requests
@@ -38,11 +38,12 @@ api_key = os.getenv("GOOGLE_BOOKS_API_KEY")
 # الـ Prompt الخاص بـ OCR
 # -----------------------------
 prompt = """
-أنت متخصص OCR.
-استخرج فقط عنوان الكتاب والتصنيف من الغلاف.
-لو التصنيف غير موجود في الصورة، ابحث أونلاين باستخدام العنوان وحدد التصنيف.
-أرجع النتيجة في JSON فقط، هكذا:
+أنت متخصص في التعرف الضوئي على النصوص (OCR).
+استخرج فقط عنوان الكتاب والتصنيف كما يظهران على غلاف الكتاب، بدون أي تعديل أو إعادة صياغة أو زيادة.
+إذا لم يكن التصنيف مكتوبًا على الغلاف، ابحث أونلاين باستخدام عنوان الكتاب فقط لتحديد التصنيف الصحيح.
+أعد النتيجة بصيغة JSON فقط، دون أي شرح أو نص إضافي، بهذا الشكل:
 {"book_name": "...", "category": "..."}
+
 """
 
 
@@ -54,7 +55,7 @@ async def extract_text(file: UploadFile = File(...)):
     try:
         raw_bytes = await file.read()
         image = Image.open(BytesIO(raw_bytes)).convert("RGB")
-
+        image = ImageOps.exif_transpose(image)
         # تحسين الصورة
         image = ImageEnhance.Brightness(image).enhance(1.02)
         image = ImageEnhance.Contrast(image).enhance(1.05)
@@ -80,23 +81,26 @@ async def extract_text(file: UploadFile = File(...)):
         # إرسال إلى OpenAI OCR
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_b64}"
-                                },
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "أنت مساعد متخصص في استخراج نصوص الكتب وتحليلها فقط."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_b64}"
                             },
-                        ],
-                    },
-                ],
-            )
+                        },
+                    ],
+                },
+            ],
+        )
             raw_text = response.choices[0].message.content.strip()
         except:
             return {"error": "Cannot upload book"}
@@ -235,6 +239,7 @@ async def add_book(
             raw_bytes = await file.read()
     
             image = Image.open(BytesIO(raw_bytes)).convert("RGB")
+            image = ImageOps.exif_transpose(image)
             image = ImageEnhance.Brightness(image).enhance(1.02)
             image = ImageEnhance.Contrast(image).enhance(1.05)
             image = ImageEnhance.Sharpness(image).enhance(1.1)
