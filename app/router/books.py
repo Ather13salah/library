@@ -232,7 +232,7 @@ async def add_book(
         cursor = conn.cursor()
         id = str(uuid.uuid4())
         image_return = None
-        if file:
+        if file is not None:
             raw_bytes = await file.read()
     
             image = Image.open(BytesIO(raw_bytes)).convert("RGB")
