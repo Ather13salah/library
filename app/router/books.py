@@ -1,4 +1,4 @@
-from PIL import Image, ImageEnhance,ImageOps
+from PIL import Image, ImageEnhance, ImageOps
 import numpy as np
 import os
 import requests
@@ -46,7 +46,32 @@ prompt = """
 
 """
 
+async def image_url(file):
+    raw_bytes = await file.read()
 
+    image = Image.open(BytesIO(raw_bytes)).convert("RGB")
+    image = ImageOps.exif_transpose(image)
+    image = ImageEnhance.Brightness(image).enhance(1.02)
+    image = ImageEnhance.Contrast(image).enhance(1.05)
+    image = ImageEnhance.Sharpness(image).enhance(1.1)
+
+    np_img = np.array(image)
+    threshold = 240
+    mask = (
+        (np_img[:, :, 0] > threshold)
+        & (np_img[:, :, 1] > threshold)
+        & (np_img[:, :, 2] > threshold)
+    )
+    np_img[mask] = [255, 255, 255]
+    image = Image.fromarray(np_img)
+
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    processed_bytes = buffer.getvalue()
+
+    result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
+    image_return = result.get("secure_url")
+    return image_return
 # -----------------------------
 # رفع صورة الكتاب وتحليلها
 # -----------------------------
@@ -81,26 +106,26 @@ async def extract_text(file: UploadFile = File(...)):
         # إرسال إلى OpenAI OCR
         try:
             response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "أنت مساعد متخصص في استخراج نصوص الكتب وتحليلها فقط."
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_b64}"
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "أنت مساعد متخصص في استخراج نصوص الكتب وتحليلها فقط.",
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_b64}"
+                                },
                             },
-                        },
-                    ],
-                },
-            ],
-        )
+                        ],
+                    },
+                ],
+            )
             raw_text = response.choices[0].message.content.strip()
         except:
             return {"error": "Cannot upload book"}
@@ -236,30 +261,8 @@ async def add_book(
         id = str(uuid.uuid4())
         image_return = None
         if file is not None:
-            raw_bytes = await file.read()
-    
-            image = Image.open(BytesIO(raw_bytes)).convert("RGB")
-            image = ImageOps.exif_transpose(image)
-            image = ImageEnhance.Brightness(image).enhance(1.02)
-            image = ImageEnhance.Contrast(image).enhance(1.05)
-            image = ImageEnhance.Sharpness(image).enhance(1.1)
-    
-            np_img = np.array(image)
-            threshold = 240
-            mask = (
-                (np_img[:, :, 0] > threshold)
-                & (np_img[:, :, 1] > threshold)
-                & (np_img[:, :, 2] > threshold)
-            )
-            np_img[mask] = [255, 255, 255]
-            image = Image.fromarray(np_img)
-    
-            buffer = BytesIO()
-            image.save(buffer, format="JPEG")
-            processed_bytes = buffer.getvalue()
-    
-            result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
-            image_return = result.get("secure_url")
+            image_return = await image_url(file)
+            
 
         cursor.execute("SELECT book_name FROM books WHERE user_id = %s", (user_id,))
         books = cursor.fetchall()
@@ -353,14 +356,25 @@ async def delete_book(user_id: str, id: str):
 # تعديل بيانات كتاب
 # -----------------------------
 @router.put("/edit-book")
-async def edit_book(new_book: BookUpdate, user_id: str, id: str):
+async def edit_book(
+    user_id: str,
+    id: str,
+    book_name: str = Form(...),
+    writer: str = Form(...),
+    publisher: str = Form(...),
+    category: str = Form(...),
+    total_pages: int = Form(...),
+    file: UploadFile = File(None),
+):
     try:
         conn = create_connection()
         cursor = conn.cursor()
-
+        image_return = None
+        if file is not None:
+            image_return = await image_url(file)
         cursor.execute(
             "SELECT id FROM books WHERE user_id = %s AND book_name = %s AND id != %s",
-            (user_id, new_book.book_name, id),
+            (user_id, book_name, id),
         )
         existing = cursor.fetchone()
         if existing:
@@ -369,15 +383,16 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         cursor.execute(
             """
             UPDATE books
-            SET book_name = %s, writer = %s, publisher = %s, category = %s, total_pages = %s
+            SET book_name = %s, writer = %s, publisher = %s, category = %s, total_pages = %s,image_url = %s
             WHERE user_id = %s AND id = %s
             """,
             (
-                new_book.book_name,
-                new_book.writer,
-                new_book.publisher,
-                new_book.category,
-                new_book.total_pages,
+                book_name,
+                writer,
+                publisher,
+                category,
+                total_pages,
+                image_return,
                 user_id,
                 id,
             ),
@@ -385,7 +400,7 @@ async def edit_book(new_book: BookUpdate, user_id: str, id: str):
         conn.commit()
         cursor.close()
         conn.close()
-        return {"done": "Book Edited"}
+        return {"done": "Book Edited","image_return":image_return}
 
     except Exception as e:
         return {"error": f"Cannot edit the book: {str(e)}"}
