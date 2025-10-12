@@ -11,7 +11,7 @@ from app.db import create_connection
 from dotenv import load_dotenv
 import base64
 from io import BytesIO
-import re
+import regex as re
 import json
 from app.router.book_update import BookData
 from app.router import favourite, daily
