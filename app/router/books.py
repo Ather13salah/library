@@ -1,4 +1,4 @@
-from PIL import Image, ImageEnhance, ImageOps
+from PIL import Image, ImageEnhance, ImageOps,ImageFilter
 import numpy as np
 import os
 import requests
@@ -39,12 +39,15 @@ api_key = os.getenv("GOOGLE_BOOKS_API_KEY")
 # الـ Prompt الخاص بـ OCR
 # -----------------------------
 prompt = """
-أنت متخصص في التعرف الضوئي على النصوص (OCR).
-استخرج فقط عنوان الكتاب والتصنيف كما يظهران على غلاف الكتاب، بدون أي تعديل أو إعادة صياغة أو زيادة.
-إذا لم يكن التصنيف مكتوبًا على الغلاف، ابحث أونلاين باستخدام عنوان الكتاب فقط لتحديد التصنيف الصحيح.
-أعد النتيجة بصيغة JSON فقط، دون أي شرح أو نص إضافي، بهذا الشكل:
+أنت نموذج OCR ذكي جدًا. مهمتك هي قراءة النصوص المطبوعة على غلاف الكتاب فقط.
+استخرج بدقة:
+1. عنوان الكتاب (book_name)
+2. التصنيف (category) إذا كان مكتوبًا على الغلاف فقط.
+❌ لا تترجم ولا تعيد صياغة ولا تضف أي كلمات من عندك.
+✅ أعد فقط كائن JSON بالصيغة التالية:
 {"book_name": "...", "category": "..."}
 
+إذا لم تجد تصنيفًا مكتوبًا على الغلاف، أعد {"book_name": "...", "category": "غير مكتوب"} فقط.
 """
 
 async def image_url(file):
@@ -52,9 +55,10 @@ async def image_url(file):
 
     image = Image.open(BytesIO(raw_bytes)).convert("RGB")
     image = ImageOps.exif_transpose(image)
-    image = ImageEnhance.Brightness(image).enhance(1.02)
-    image = ImageEnhance.Contrast(image).enhance(1.05)
-    image = ImageEnhance.Sharpness(image).enhance(1.1)
+    image = ImageEnhance.Brightness(image).enhance(1.01)
+    image = ImageEnhance.Contrast(image).enhance(1.02)
+    image = ImageEnhance.Sharpness(image).enhance(1.05)
+    image = image.filter(ImageFilter.MedianFilter(size=3))
 
     np_img = np.array(image)
     threshold = 240
@@ -67,7 +71,7 @@ async def image_url(file):
     image = Image.fromarray(np_img)
 
     buffer = BytesIO()
-    image.save(buffer, format="JPEG")
+    image.save(buffer, format="PNG")
     processed_bytes = buffer.getvalue()
 
     result = cloudinary.uploader.upload(processed_bytes, folder="my_books")
@@ -100,33 +104,23 @@ async def extract_text(file: UploadFile = File(...)):
 
         # تحويل الصورة إلى base64
         buffer = BytesIO()
-        image.save(buffer, format="JPEG")
+        image.save(buffer, format="PNG")
         processed_bytes = buffer.getvalue()
         image_b64 = base64.b64encode(processed_bytes).decode("utf-8")
 
         # إرسال إلى OpenAI OCR
         try:
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "أنت مساعد متخصص في استخراج نصوص الكتب وتحليلها فقط.",
-                    },
-                    {
-                        "role": "user",
-                        "content": [
+                    model="gpt-4o-mini",
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": "أنت مساعد متخصص في OCR."},
+                        {"role": "user", "content": [
                             {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_b64}"
-                                },
-                            },
-                        ],
-                    },
-                ],
-            )
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}}
+                        ]}
+                    ]
+                )
             raw_text = response.choices[0].message.content.strip()
         except:
             return {"error": "Cannot upload book"}
