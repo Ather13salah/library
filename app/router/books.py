@@ -11,6 +11,7 @@ from app.db import create_connection
 from dotenv import load_dotenv
 import base64
 from io import BytesIO
+import re
 import json
 from app.router.book_update import BookData
 from app.router import favourite, daily
@@ -135,7 +136,7 @@ async def extract_text(file: UploadFile = File(...)):
         category_text = "غير معروف"
 
         try:
-
+            cleaned = re.sub(r"^```(?:json)?|```$", "", raw_text.strip(), flags=re.IGNORECASE).strip()
             parsed = json.loads(raw_text)
             title_text = parsed.get("book_name", "").strip()
             category_text = parsed.get("category", "")
